@@ -1,0 +1,220 @@
+# scrape premier league scores, build own weekly table
+# then use this to plot positions week by week.
+
+
+
+
+library(rvest)
+library(httr)
+
+library(gganimate)
+library(ggimage)
+
+library(tidyverse)
+
+s_theme2 = function(){
+  theme(#legend.position = "none",
+    panel.background = element_blank(),
+    panel.grid.major.y = element_line(color = "grey80"),
+    axis.line.x = element_line(color = "grey80"),
+    axis.line.y = element_line(color = "grey80"),
+    text = element_text(family = "Mary Ann Medium"),
+    plot.title = element_text(size = 20),
+    plot.subtitle = element_text(size = 12),
+    plot.background = element_rect(fill = "#F6F6F6" ),
+    axis.title = element_text(size = 14),
+    legend.position = "top",
+    legend.text.align = 0,
+    legend.background = element_blank(),
+    legend.title = element_text(size = 15), legend.key = element_blank(),
+    legend.text = element_text(family = "Mary Ann", size = 18, color = "#222222"),
+    legend.spacing.x = unit(0.3, "cm")
+  ) }
+
+games = list()
+
+
+url = "https://fantasy.premierleague.com/drf/fixtures/?event=1"
+
+
+gameweek = fromJSON(url) %>% as_tibble
+
+
+
+
+url = url = paste0("https://fantasy.premierleague.com/drf/fixtures/?event=1")
+gameweek = fromJSON(url) %>% as_tibble
+
+all_teams = c("Man United",
+           "Newcastle",
+           "Bournemouth",
+           "Fulham",
+           "Huddersfield",
+           "Watford",
+           "Wolves",
+           "Liverpool",
+           "Southampton",
+           "Arsenal",
+           "Leicester",
+           "Spurs",
+           "Cardiff",
+           "Chelsea",
+           "Crystal Palace",
+           "Brighton",
+           "Everton",
+           "West Ham",
+           "Burnley",
+           "Man City"
+           )
+
+team_id_lookup = tibble(teams = c(gameweek$team_a, gameweek$team_h) %>% sort,
+                        team_name = all_teams %>% sort)
+games = list()
+
+for (gw in 1:29){
+  url = url = paste0("https://fantasy.premierleague.com/drf/fixtures/?event=",gw)
+  gameweek = fromJSON(url) %>% as_tibble
+  games[[gw]] = tibble()
+
+  gameweek = gameweek %>% mutate(points_a = if_else(team_a_score > team_h_score, 3, if_else(team_a_score == team_h_score, 1, 0) ),
+                      points_h = if_else(team_a_score < team_h_score, 3, if_else(team_a_score == team_h_score, 1, 0) ) )
+
+
+    games[[gw]] = bind_rows(games[[gw]],
+                            tibble(teams = c(gameweek$team_a, gameweek$team_h),
+                                   scoredGoals = c(gameweek$team_a_score, gameweek$team_h_score),
+                                   against = c(gameweek$team_h_score, gameweek$team_a_score),
+                                   points = c(gameweek$points_a, gameweek$points_h))) %>%
+      inner_join(team_id_lookup)
+print(gw)
+    }
+
+
+
+#all_teams = lapply(games, function(x)x$teams) %>% unlist(use.names = F) %>% unique
+
+bigtable = tibble()
+table = tibble(team = all_teams, gp = 0, gf = 0, ga = 0,points = 0) %>% arrange(team)
+bigtable = table %>% mutate(gw = 0, position = 1:20)
+
+for (day in 1:length(games)){
+
+
+  if(day != 1) table = tail(bigtable, 20)
+  table$gw = day
+    for (j in 1:nrow(games[[day]])){
+
+      t = games[[day]]$team_name[j]
+      gf = games[[day]]$scoredGoals[j]
+      ga = games[[day]]$against[j]
+      points = games[[day]]$points[j]
+      table[table$team == t,]$gp = table[table$team == t,]$gp + 1
+      table[table$team == t,]$gf = table[table$team == t,]$gf + gf
+      table[table$team == t,]$ga = table[table$team == t,]$ga + ga
+      table[table$team == t,]$points = table[table$team == t,]$points + points
+    }
+  table$date = day
+    table = table %>%
+      arrange(-points, -(gf - ga), team) %>% mutate(gd = gf - ga,
+                                                    position = row_number())
+bigtable = bigtable %>% bind_rows(table)
+print(day)
+}
+
+
+
+
+team_colors = tibble(team= all_teams %>% sort,
+                     color = c( "#ef0107", "#ed1c24",
+                               "#005daa", "#80bfff",
+                               "#0000ff", "#034694",
+                               "#0a4af5", "#0d00e9",
+                               "grey50", "#192552",
+                               "#0053a0", "#dd0000",
+                               "#97c1e7", "#e80909",
+                               "#000000", "#ff0000",
+                               "#132257", "#fbee23",
+                               "#7f0000", "#fdb913"
+                               ),
+                     team_nick = c("Arsenal","Bournemouth",
+                                   "Brighton", "Burnley",
+                                   "Cardiff", "Chelsea","Crystal Palace",
+                                   "Everton", "Fulham", "Huddersfield",
+                                   "Leicester", "Liverpool", "Man City",
+                                   "Man United", "Newcastle", "Southampton",
+                                   "Tottenham", "Watford", "West Ham", "Wolves"
+
+                     ),
+                     badge = c("Documents/New folder/ars.png",
+                               "Documents/New folder/bou.png",
+                       "Documents/New folder/bri.png",
+                       "Documents/New folder/bur.png",
+                       "Documents/New folder/car.png",
+                       "Documents/New folder/che.png",
+                       "Documents/New folder/cry.png",
+                       "Documents/New folder/eve.png",
+                       "Documents/New folder/ful.png",
+                       "Documents/New folder/hud.png",
+                       "Documents/New folder/lei.png",
+                       "Documents/New folder/liv.png",
+                       "Documents/New folder/mnc.png",
+                       "Documents/New folder/mnu.png",
+                       "Documents/New folder/new.png",
+                       "Documents/New folder/sou.png",
+                       "Documents/New folder/tot.png",
+                       "Documents/New folder/wat.png",
+                       "Documents/New folder/whu.png",
+                       "Documents/New folder/wol.png"
+                       )
+                       )
+
+
+
+q = ggplot(bigtable %>% inner_join(team_colors[, c("team", "team_nick","badge")]), aes(gw, position %>%rev, group = team)) +
+  geom_line(aes(color = team)) +
+  s_theme2() +
+  geom_segment(aes(xend = max(bigtable$gw) + 2, yend = position %>% rev), linetype = 2) +
+  geom_image(aes(image=badge)) +
+  geom_text(aes(x = max(bigtable$gw) + 2, label = team_nick), size = 5, hjust = 0, family = "Mary Ann Medium") +
+  scale_x_continuous(limits = c(0, max(bigtable$gw) + 5 ), breaks = c(0,5,10,15,20,25,29)) +
+  transition_reveal(gw) +
+  scale_color_manual(values = team_colors$color) +
+  theme(legend.position = "none",
+        axis.text = element_text(size = 15),
+        axis.title = element_text(size = 16),
+        plot.caption = element_text(size = 14),
+        plot.subtitle = element_text(size = 16)
+        ) +
+  labs(title = "Premier League position 2018/19",
+       subtitle = "As of 2019-03-07",
+       y = "position",
+       x = "Gameweek",
+       caption = "@mattthereed") +
+  coord_cartesian(clip = 'off') +
+  scale_y_continuous(breaks = c(21 - 1, 21 - 4, 21 - 7, 21 - 10, 21 - 18, 21 - 20), labels = c("1","4","7","10","18","20") ) +
+  theme(axis.text = element_text(size = 12),
+        plot.caption = element_text(size = 13)) +
+    ease_aes('cubic-in-out')
+
+#theme(plot.margin = margin(r = 0.3, unit = "npc"))
+
+
+animate(q, nframes = 300, fps = 15, start_pause = 30, end_pause = 30, height = 800, width = 800 )
+
+anim_save("prem position.gif", path = "documents")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
