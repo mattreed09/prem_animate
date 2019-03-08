@@ -1,2 +1,2 @@
 # prem_animate
-code to generatea moving premier league table
+code to generate a moving premier league table
